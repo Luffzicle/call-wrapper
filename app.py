@@ -1,86 +1,68 @@
+from datetime import date
 import streamlit as st
 import pandas as pd
-from datetime import datetime
 
-# Store form data
-def get_interest_fields(interest):
-    if interest == "Football":
-        return {
-            "Region": ["Europe", "South America", "North America"],
-            "Player": ["Messi", "Ronaldo", "Mbappe"],
-            "Position": ["Winger", "Defender", "Midfielder", "Goalkeeper"],
-        }
-    elif interest == "Basketball":
-        return {
-            "League": ["NBA", "EuroLeague"],
-            "Position": ["Guard", "Forward", "Center"],
-            "Player": ["LeBron", "Curry", "Giannis"]
-        }
-    elif interest == "Tennis":
-        return {
-            "Handedness": ["Left", "Right"],
-            "Surface Preference": ["Grass", "Clay", "Hard"],
-            "Favorite Player": ["Federer", "Nadal", "Djokovic"]
-        }
-    elif interest == "Cricket":
-        return {
-            "Format": ["Test", "ODI", "T20"],
-            "Role": ["Batsman", "Bowler", "All-Rounder"],
-            "Favorite Player": ["Kohli", "Root", "Smith"]
-        }
-    return {}
+# Set up session state to store inputs
+if 'submitted_data' not in st.session_state:
+    st.session_state.submitted_data = []
 
-# Excel file name
-EXCEL_FILE = "submissions.xlsx"
+st.set_page_config(page_title="Interest Capture Tool", layout="centered")
+st.title("📝 Interest Capture Form")
 
-# Initialize Excel
-def initialize_excel():
-    try:
-        pd.read_excel(EXCEL_FILE)
-    except FileNotFoundError:
-        df = pd.DataFrame()
-        df.to_excel(EXCEL_FILE, index=False)
-
-# Save data to Excel
-def save_data(data):
-    try:
-        df = pd.read_excel(EXCEL_FILE)
-    except FileNotFoundError:
-        df = pd.DataFrame()
-
-    df = pd.concat([df, pd.DataFrame([data])], ignore_index=True)
-    df.to_excel(EXCEL_FILE, index=False)
-
-# --- Streamlit App ---
-st.set_page_config(page_title="Interest Collector", layout="centered")
-
-st.title("📝 Interest Collection Tool")
-
+# Basic Details
 with st.form("interest_form", clear_on_submit=True):
-    st.subheader("Basic Info")
-    name = st.text_input("Name")
-    dob = st.date_input("Date of Birth")
+    name = st.text_input("Full Name")
     user_id = st.text_input("User ID")
+    dob = st.date_input("Date of Birth", min_value=date(1900, 1, 1), max_value=date.today())
 
-    st.subheader("Interest Info")
-    interest = st.selectbox("Select Interest", ["Football", "Basketball", "Tennis", "Cricket"])
-    dynamic_fields = get_interest_fields(interest)
-    
-    field_responses = {}
-    for label, options in dynamic_fields.items():
-        field_responses[label] = st.selectbox(label, options)
+    # Interest Dropdown
+    interest = st.selectbox("Select Interest", ["Select", "Football", "Basketball", "Tennis", "Cricket"])
+
+    # Conditional Fields Based on Interest
+    details = {}
+    if interest == "Football":
+        details['Region'] = st.selectbox("Region", ["Europe", "America", "Asia"])
+        details['Favorite Player'] = st.selectbox("Favorite Player", ["Messi", "Ronaldo", "Mbappe"])
+        details['Position'] = st.selectbox("Position", ["Winger", "Defender", "Midfielder", "Goalkeeper"])
+    elif interest == "Basketball":
+        details['League'] = st.selectbox("League", ["NBA", "EuroLeague"])
+        details['Position'] = st.selectbox("Position", ["Guard", "Forward", "Center"])
+        details['Favorite Player'] = st.selectbox("Favorite Player", ["LeBron James", "Stephen Curry", "Giannis"])
+    elif interest == "Tennis":
+        details['Favorite Surface'] = st.selectbox("Favorite Surface", ["Clay", "Grass", "Hard"])
+        details['Handedness'] = st.selectbox("Play Style", ["Left-handed", "Right-handed"])
+        details['Favorite Player'] = st.selectbox("Favorite Player", ["Federer", "Nadal", "Djokovic"])
+    elif interest == "Cricket":
+        details['Format'] = st.selectbox("Preferred Format", ["Test", "ODI", "T20"])
+        details['Favorite Player'] = st.selectbox("Favorite Player", ["Kohli", "Root", "Smith", "Babar"])
+        details['Role'] = st.selectbox("Role", ["Batsman", "Bowler", "All-rounder", "Wicketkeeper"])
 
     submitted = st.form_submit_button("Submit")
 
     if submitted:
-        all_data = {
-            "Timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        record = {
             "Name": name,
-            "DOB": dob,
-            "User ID": user_id,
+            "ID": user_id,
+            "DOB": dob.strftime("%Y-%m-%d"),
             "Interest": interest
         }
-        all_data.update(field_responses)
+        record.update(details)
+        st.session_state.submitted_data.append(record)
+        st.success("Submission recorded!")
 
-        save_data(all_data)
-        st.success("✅ Submitted successfully!")
+# Show collected data in a table
+if st.session_state.submitted_data:
+    df = pd.DataFrame(st.session_state.submitted_data)
+    st.write("### Submitted Records")
+    st.dataframe(df)
+
+    # Export to Excel
+    def convert_df(df):
+        return df.to_excel(index=False, engine='openpyxl')
+
+    st.download_button(
+        label="📥 Download as Excel",
+        data=convert_df(df),
+        file_name="interest_submissions.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
